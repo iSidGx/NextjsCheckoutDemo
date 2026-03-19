@@ -1,5 +1,5 @@
 import path from "node:path";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { PersistedOrderRecord } from "@/domain/orders/types";
 
 function getOrderStoreFilePath() {
@@ -35,7 +35,12 @@ async function writeOrdersToDisk(orders: PersistedOrderRecord[]) {
   const directory = path.dirname(storeFilePath);
 
   await mkdir(directory, { recursive: true });
-  await writeFile(storeFilePath, JSON.stringify(orders, null, 2), "utf8");
+
+  const tempFilePath = `${storeFilePath}.tmp-${process.pid}-${Date.now()}`;
+  const serialized = JSON.stringify(orders, null, 2);
+
+  await writeFile(tempFilePath, serialized, "utf8");
+  await rename(tempFilePath, storeFilePath);
 }
 
 let orderStoreQueue: Promise<unknown> = Promise.resolve();
