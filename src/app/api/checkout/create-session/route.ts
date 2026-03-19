@@ -27,13 +27,7 @@ const createSessionSchema = z.object({
   deliveryOptionId: deliveryOptionSchema,
 });
 
-function getAppOrigin(request: Request) {
-  const requestOrigin = request.headers.get("origin");
-
-  if (requestOrigin) {
-    return requestOrigin;
-  }
-
+function getAppOrigin(_request: Request) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
   if (!appUrl) {
