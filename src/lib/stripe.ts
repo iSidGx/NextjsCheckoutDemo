@@ -24,7 +24,9 @@ export function getStripeWebhookSecret() {
 
 export function getStripeClient() {
   if (!stripeClient) {
-    stripeClient = new Stripe(getStripeSecretKey());
+    stripeClient = new Stripe(getStripeSecretKey(), {
+      apiVersion: "2022-11-15",
+    });
   }
 
   return stripeClient;
