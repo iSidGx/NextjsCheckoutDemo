@@ -4,18 +4,18 @@ import { getOrderRecordByCheckoutSessionId } from "@/server/order-store";
 export const runtime = "nodejs";
 
 interface RouteContext {
-  params: Promise<{ sessionId: string }>;
+  params: { sessionId: string };
 }
 
 export async function GET(_: Request, context: RouteContext) {
-  const params = await context.params;
   let sessionId: string;
   try {
-    sessionId = decodeURIComponent(params.sessionId);
+    sessionId = decodeURIComponent(context.params.sessionId);
   } catch {
     return NextResponse.json({ error: "Invalid session ID." }, { status: 400 });
   }
   const order = await getOrderRecordByCheckoutSessionId(sessionId);
+
 
   if (!order) {
     return NextResponse.json({ error: "Order not found." }, { status: 404 });
