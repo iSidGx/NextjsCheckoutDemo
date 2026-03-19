@@ -9,7 +9,12 @@ interface RouteContext {
 
 export async function GET(_: Request, context: RouteContext) {
   const params = await context.params;
-  const sessionId = decodeURIComponent(params.sessionId);
+  let sessionId: string;
+  try {
+    sessionId = decodeURIComponent(params.sessionId);
+  } catch {
+    return NextResponse.json({ error: "Invalid session ID." }, { status: 400 });
+  }
   const order = await getOrderRecordByCheckoutSessionId(sessionId);
 
   if (!order) {
