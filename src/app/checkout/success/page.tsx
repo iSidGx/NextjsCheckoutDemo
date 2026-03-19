@@ -33,33 +33,44 @@ export default function CheckoutSuccessPage() {
           break;
         }
 
-        const response = await fetch(
-          `/api/orders/by-session/${encodeURIComponent(checkoutSessionId)}`,
-          {
-            cache: "no-store",
-            signal: controller.signal,
-          },
-        );
+        try {
+          const response = await fetch(
+            `/api/orders/by-session/${encodeURIComponent(checkoutSessionId)}`,
+            {
+              cache: "no-store",
+              signal: controller.signal,
+            },
+          );
 
-        if (response.ok) {
-          const data = (await response.json()) as { order: PersistedOrderRecord };
+          if (response.ok) {
+            const data = (await response.json()) as { order: PersistedOrderRecord };
 
-          if (isActive && !controller.signal.aborted) {
-            setOrder(data.order);
-            setIsLoadingOrder(false);
+            if (isActive && !controller.signal.aborted) {
+              setOrder(data.order);
+              setIsLoadingOrder(false);
+            }
+
+            return;
           }
 
-          return;
-        }
+          if (response.status !== 404) {
+            const data = (await response.json()) as { error?: string };
 
-        if (response.status !== 404) {
-          const data = (await response.json()) as { error?: string };
+            if (isActive && !controller.signal.aborted) {
+              setOrderError(data.error ?? "Unable to load your order details.");
+              setIsLoadingOrder(false);
+            }
 
-          if (isActive && !controller.signal.aborted) {
-            setOrderError(data.error ?? "Unable to load your order details.");
-            setIsLoadingOrder(false);
+            return;
+          }
+        } catch (error) {
+          // Respect aborts and unmounts: do not update state if no longer active.
+          if (!isActive || controller.signal.aborted) {
+            return;
           }
 
+          setOrderError("Unable to load your order details.");
+          setIsLoadingOrder(false);
           return;
         }
 
