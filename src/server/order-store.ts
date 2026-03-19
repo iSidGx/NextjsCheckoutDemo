@@ -30,21 +30,34 @@ async function writeOrdersToDisk(orders: PersistedOrderRecord[]) {
   await writeFile(storeFilePath, JSON.stringify(orders, null, 2), "utf8");
 }
 
-export async function upsertOrderRecord(order: PersistedOrderRecord) {
-  const existingOrders = await readOrdersFromDisk();
-  const matchingIndex = existingOrders.findIndex(
-    (entry) => entry.checkoutSessionId === order.checkoutSessionId,
+let orderStoreQueue: Promise<unknown> = Promise.resolve();
+
+function enqueueOrderStoreOperation<T>(operation: () => Promise<T>): Promise<T> {
+  const result = orderStoreQueue.then(operation, operation);
+  orderStoreQueue = result.then(
+    () => undefined,
+    () => undefined,
   );
+  return result;
+}
 
-  if (matchingIndex >= 0) {
-    existingOrders[matchingIndex] = order;
-  } else {
-    existingOrders.unshift(order);
-  }
+export async function upsertOrderRecord(order: PersistedOrderRecord) {
+  return enqueueOrderStoreOperation(async () => {
+    const existingOrders = await readOrdersFromDisk();
+    const matchingIndex = existingOrders.findIndex(
+      (entry) => entry.checkoutSessionId === order.checkoutSessionId,
+    );
 
-  await writeOrdersToDisk(existingOrders);
+    if (matchingIndex >= 0) {
+      existingOrders[matchingIndex] = order;
+    } else {
+      existingOrders.unshift(order);
+    }
 
-  return order;
+    await writeOrdersToDisk(existingOrders);
+
+    return order;
+  });
 }
 
 export async function getOrderRecordByCheckoutSessionId(checkoutSessionId: string) {
