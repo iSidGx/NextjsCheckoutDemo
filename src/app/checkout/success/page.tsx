@@ -22,23 +22,29 @@ export default function CheckoutSuccessPage() {
     clearBasket();
 
     let isActive = true;
+    const controller = new AbortController();
 
     const loadOrder = async () => {
       setIsLoadingOrder(true);
       setOrderError(null);
 
       for (let attempt = 0; attempt < 5; attempt += 1) {
+        if (!isActive || controller.signal.aborted) {
+          break;
+        }
+
         const response = await fetch(
           `/api/orders/by-session/${encodeURIComponent(checkoutSessionId)}`,
           {
             cache: "no-store",
+            signal: controller.signal,
           },
         );
 
         if (response.ok) {
           const data = (await response.json()) as { order: PersistedOrderRecord };
 
-          if (isActive) {
+          if (isActive && !controller.signal.aborted) {
             setOrder(data.order);
             setIsLoadingOrder(false);
           }
@@ -49,7 +55,7 @@ export default function CheckoutSuccessPage() {
         if (response.status !== 404) {
           const data = (await response.json()) as { error?: string };
 
-          if (isActive) {
+          if (isActive && !controller.signal.aborted) {
             setOrderError(data.error ?? "Unable to load your order details.");
             setIsLoadingOrder(false);
           }
@@ -58,11 +64,19 @@ export default function CheckoutSuccessPage() {
         }
 
         await new Promise((resolve) => {
-          setTimeout(resolve, 700);
+          const timeoutId = setTimeout(resolve, 700);
+          controller.signal.addEventListener(
+            "abort",
+            () => {
+              clearTimeout(timeoutId);
+              resolve(undefined);
+            },
+            { once: true },
+          );
         });
       }
 
-      if (isActive) {
+      if (isActive && !controller.signal.aborted) {
         setOrderError(
           "Payment succeeded, but order details are still syncing. Refresh in a few seconds.",
         );
@@ -74,6 +88,7 @@ export default function CheckoutSuccessPage() {
 
     return () => {
       isActive = false;
+      controller.abort();
     };
   }, [clearBasket]);
 
