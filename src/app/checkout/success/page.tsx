@@ -1,14 +1,80 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { formatCurrency } from "@/domain/mugs/pricing";
+import { PersistedOrderRecord } from "@/domain/orders/types";
 import { useBasketStore } from "@/store/basket-store";
 
 export default function CheckoutSuccessPage() {
   const clearBasket = useBasketStore((state) => state.clearBasket);
+  const [order, setOrder] = useState<PersistedOrderRecord | null>(null);
+  const [isLoadingOrder, setIsLoadingOrder] = useState(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
 
   useEffect(() => {
+    const checkoutSessionId = new URLSearchParams(window.location.search).get("session_id");
+
+    if (!checkoutSessionId) {
+      return;
+    }
+
     clearBasket();
+
+    let isActive = true;
+
+    const loadOrder = async () => {
+      setIsLoadingOrder(true);
+      setOrderError(null);
+
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const response = await fetch(
+          `/api/orders/by-session/${encodeURIComponent(checkoutSessionId)}`,
+          {
+            cache: "no-store",
+          },
+        );
+
+        if (response.ok) {
+          const data = (await response.json()) as { order: PersistedOrderRecord };
+
+          if (isActive) {
+            setOrder(data.order);
+            setIsLoadingOrder(false);
+          }
+
+          return;
+        }
+
+        if (response.status !== 404) {
+          const data = (await response.json()) as { error?: string };
+
+          if (isActive) {
+            setOrderError(data.error ?? "Unable to load your order details.");
+            setIsLoadingOrder(false);
+          }
+
+          return;
+        }
+
+        await new Promise((resolve) => {
+          setTimeout(resolve, 700);
+        });
+      }
+
+      if (isActive) {
+        setOrderError(
+          "Payment succeeded, but order details are still syncing. Refresh in a few seconds.",
+        );
+        setIsLoadingOrder(false);
+      }
+    };
+
+    void loadOrder();
+
+    return () => {
+      isActive = false;
+    };
   }, [clearBasket]);
 
   return (
@@ -24,6 +90,62 @@ export default function CheckoutSuccessPage() {
           This confirmation page is part of the demo flow. In a production build,
           this would be backed by a payment and fulfillment pipeline.
         </p>
+
+        {isLoadingOrder ? (
+          <p className="mt-6 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-600">
+            Confirming payment details from Stripe...
+          </p>
+        ) : null}
+
+        {order ? (
+          <section className="mt-6 rounded-2xl border border-stone-200 bg-stone-50 p-5 text-sm text-stone-700">
+            <h2 className="text-lg font-semibold text-stone-900">Payment record</h2>
+            <div className="mt-3 grid gap-2">
+              <p>
+                <span className="font-semibold text-stone-900">Session:</span>{" "}
+                <span className="font-mono text-xs">{order.checkoutSessionId}</span>
+              </p>
+              <p>
+                <span className="font-semibold text-stone-900">Status:</span> {order.paymentStatus}
+              </p>
+              <p>
+                <span className="font-semibold text-stone-900">Total:</span>{" "}
+                {formatCurrency(order.amountTotalMinor / 100)}
+              </p>
+              <p>
+                <span className="font-semibold text-stone-900">Confirmed at:</span>{" "}
+                {new Date(order.confirmedAt).toLocaleString()}
+              </p>
+              {order.customerEmail ? (
+                <p>
+                  <span className="font-semibold text-stone-900">Customer email:</span>{" "}
+                  {order.customerEmail}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="mt-4 space-y-2 border-t border-stone-200 pt-4">
+              {order.lineItems.map((lineItem, index) => (
+                <div
+                  key={`${lineItem.description}-${lineItem.quantity}-${index}`}
+                  className="flex items-center justify-between gap-3"
+                >
+                  <span>{lineItem.description}</span>
+                  <span>
+                    {lineItem.quantity} × {formatCurrency(lineItem.totalAmountMinor / 100 / lineItem.quantity)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {orderError ? (
+          <p className="mt-6 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {orderError}
+          </p>
+        ) : null}
+
         <div className="mt-8 flex flex-wrap gap-4">
           <Link
             href="/"
