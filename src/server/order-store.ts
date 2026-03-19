@@ -17,8 +17,16 @@ async function readOrdersFromDisk() {
     }
 
     return parsed;
-  } catch {
-    return [];
+  } catch (error) {
+    const err = error as NodeJS.ErrnoException;
+
+    if (err && typeof err === "object" && err.code === "ENOENT") {
+      // Treat missing file as an empty store.
+      return [];
+    }
+
+    console.error("Failed to read orders from disk:", err);
+    throw err;
   }
 }
 
