@@ -38,8 +38,8 @@ export async function POST(request: Request) {
         lineItems: lineItems.data.map((lineItem) => ({
           description: lineItem.description ?? "Order item",
           quantity: lineItem.quantity ?? 1,
-          totalAmountMinor: lineItem.amount_total,
-          currency: lineItem.currency,
+          totalAmountMinor: lineItem.amount_total ?? 0,
+          currency: lineItem.currency ?? session.currency ?? "gbp",
         })),
       });
 
