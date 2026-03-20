@@ -78,3 +78,12 @@ export async function getOrderRecordByCheckoutSessionId(checkoutSessionId: strin
 
   return existingOrders.find((entry) => entry.checkoutSessionId === checkoutSessionId) ?? null;
 }
+
+export async function getOrdersByCustomerEmail(customerEmail: string) {
+  const normalizedEmail = customerEmail.trim().toLowerCase();
+  const existingOrders = await readOrdersFromDisk();
+
+  return existingOrders
+    .filter((entry) => (entry.customerEmail ?? "").trim().toLowerCase() === normalizedEmail)
+    .sort((a, b) => (a.confirmedAt < b.confirmedAt ? 1 : -1));
+}

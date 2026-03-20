@@ -1,6 +1,6 @@
 # Mug Atelier Demo
 
-Next.js App Router demo for a customizable mug storefront with a product catalog, persisted basket, Stripe test checkout, webhook confirmation, and persisted order records.
+Next.js App Router demo for a customizable mug storefront with a product catalog, persisted basket, secure login flow, Stripe test checkout, webhook confirmation, and persisted order records.
 
 ## Features
 
@@ -8,8 +8,10 @@ Next.js App Router demo for a customizable mug storefront with a product catalog
 - Product customization (size, design, quantity) with live mug preview.
 - Basket management with persisted client state via Zustand.
 - Checkout flow backed by Stripe Checkout (test mode).
+- Secure account login/registration with signed HTTP-only session cookies.
 - Webhook-confirmed order persistence to a lightweight JSON store.
 - Success page that loads and displays the confirmed order record.
+- Account page that shows profile details and past paid orders.
 - Unit and component tests with Vitest + Testing Library.
 
 ## Tech stack
@@ -60,10 +62,12 @@ cp .env.example .env.local
 - `NEXT_PUBLIC_APP_URL`: app base URL (local: `http://localhost:3000`)
 - `STRIPE_SECRET_KEY`: Stripe test secret key (`sk_test_...`)
 - `STRIPE_WEBHOOK_SECRET`: Stripe webhook signing secret (`whsec_...`)
+- `AUTH_SESSION_SECRET`: random secret used to sign session cookies (32+ chars)
 
 Optional:
 
 - `ORDER_STORE_FILE`: absolute path for JSON order store file (default: `data/orders.json`)
+- `USER_STORE_FILE`: absolute path for JSON user store file (default: `data/users.json`)
 
 ## Run locally
 
@@ -103,6 +107,21 @@ Test card example:
 
 If payment is canceled, Stripe returns to `/checkout?canceled=1` and basket contents remain unchanged.
 
+## Login and account flow
+
+1) Open `/login` and register an account (name, email, password).
+2) Login issues a signed, HTTP-only session cookie.
+3) Open `/account` to view account info and past paid orders.
+4) Orders are matched by the authenticated account email.
+
+Auth endpoints:
+
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+- `GET /api/orders/mine`
+
 ## Order persistence
 
 - Store implementation: `src/server/order-store.ts`
@@ -135,7 +154,8 @@ npm run build
 - `src/components` — UI components
 - `src/domain/mugs` — catalog, pricing, search, validation, types
 - `src/domain/orders` — persisted order types
-- `src/server` — server-side JSON order store
+- `src/domain/auth` — authentication and session types
+- `src/server` — server-side order/user stores and auth utilities
 - `src/store` — client basket store
 
 ## Troubleshooting

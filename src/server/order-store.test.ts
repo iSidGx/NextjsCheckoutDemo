@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  getOrdersByCustomerEmail,
   getOrderRecordByCheckoutSessionId,
   upsertOrderRecord,
 } from "./order-store";
@@ -97,5 +98,52 @@ describe("order-store", () => {
     expect(order).not.toBeNull();
     expect(order?.paymentStatus).toBe("paid");
     expect(order?.confirmedAt).toBe("2026-03-19T10:05:02.000Z");
+  });
+
+  it("returns only orders matching the customer email sorted newest first", async () => {
+    await upsertOrderRecord({
+      id: "order_cs_test_a",
+      checkoutSessionId: "cs_test_a",
+      paymentStatus: "paid",
+      amountTotalMinor: 1200,
+      currency: "gbp",
+      customerEmail: "buyer@example.com",
+      deliveryOptionId: "standard",
+      createdAt: "2026-03-19T10:00:00.000Z",
+      confirmedAt: "2026-03-19T10:00:01.000Z",
+      lineItems: [],
+    });
+
+    await upsertOrderRecord({
+      id: "order_cs_test_b",
+      checkoutSessionId: "cs_test_b",
+      paymentStatus: "paid",
+      amountTotalMinor: 1900,
+      currency: "gbp",
+      customerEmail: "other@example.com",
+      deliveryOptionId: "express",
+      createdAt: "2026-03-19T10:05:00.000Z",
+      confirmedAt: "2026-03-19T10:05:01.000Z",
+      lineItems: [],
+    });
+
+    await upsertOrderRecord({
+      id: "order_cs_test_c",
+      checkoutSessionId: "cs_test_c",
+      paymentStatus: "paid",
+      amountTotalMinor: 2200,
+      currency: "gbp",
+      customerEmail: "BUYER@example.com",
+      deliveryOptionId: "express",
+      createdAt: "2026-03-19T10:10:00.000Z",
+      confirmedAt: "2026-03-19T10:10:01.000Z",
+      lineItems: [],
+    });
+
+    const orders = await getOrdersByCustomerEmail("buyer@example.com");
+
+    expect(orders).toHaveLength(2);
+    expect(orders[0]?.checkoutSessionId).toBe("cs_test_c");
+    expect(orders[1]?.checkoutSessionId).toBe("cs_test_a");
   });
 });

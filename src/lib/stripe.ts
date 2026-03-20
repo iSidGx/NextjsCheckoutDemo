@@ -25,7 +25,7 @@ export function getStripeWebhookSecret() {
 export function getStripeClient() {
   if (!stripeClient) {
     stripeClient = new Stripe(getStripeSecretKey(), {
-      apiVersion: "2022-11-15",
+      apiVersion: "2026-02-25.clover",
     });
   }
 

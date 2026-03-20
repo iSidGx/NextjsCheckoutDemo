@@ -53,8 +53,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Invalid Stripe webhook event.";
-
-    return NextResponse.json({ error: message }, { status: 400 });
+    console.error("Stripe webhook processing failed", error);
+    return NextResponse.json({ error: "Invalid Stripe webhook event." }, { status: 400 });
   }
 }
