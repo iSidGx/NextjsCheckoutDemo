@@ -63,7 +63,7 @@ cp .env.example .env.local
 - `STRIPE_SECRET_KEY`: Stripe test secret key (`sk_test_...`)
 - `STRIPE_WEBHOOK_SECRET`: Stripe webhook signing secret (`whsec_...`)
 - `JWT_ACCESS_SECRET`: random secret used to sign access JWT cookies (32+ chars)
-- `JWT_REFRESH_SECRET`: random secret used to sign refresh JWT cookies (32+ chars)
+- `JWT_REFRESH_SECRET`: random secret used to sign refresh JWT cookies (32+ chars, required in production)
 
 Optional:
 

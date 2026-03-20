@@ -28,15 +28,29 @@ function getJwtSecret() {
 }
 
 function getRefreshJwtSecret() {
-  const secret = process.env.JWT_REFRESH_SECRET ?? process.env.JWT_ACCESS_SECRET ?? process.env.AUTH_SESSION_SECRET;
+  const refreshSecret = process.env.JWT_REFRESH_SECRET;
 
-  if (!secret || secret.length < 32) {
+  if (refreshSecret) {
+    if (refreshSecret.length < 32) {
+      throw new Error("JWT_REFRESH_SECRET must be at least 32 characters long.");
+    }
+
+    return new TextEncoder().encode(refreshSecret);
+  }
+
+  const fallbackSecret = process.env.JWT_ACCESS_SECRET ?? process.env.AUTH_SESSION_SECRET;
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("JWT_REFRESH_SECRET must be set in production.");
+  }
+
+  if (!fallbackSecret || fallbackSecret.length < 32) {
     throw new Error(
-      "JWT_REFRESH_SECRET (or JWT_ACCESS_SECRET/AUTH_SESSION_SECRET fallback) must be set and at least 32 characters long.",
+      "JWT_REFRESH_SECRET is recommended; fallback JWT_ACCESS_SECRET/AUTH_SESSION_SECRET must be at least 32 characters long.",
     );
   }
 
-  return new TextEncoder().encode(secret);
+  return new TextEncoder().encode(fallbackSecret);
 }
 
 export async function createSessionToken(user: SessionUser) {

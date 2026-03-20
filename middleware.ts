@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { AUTH_COOKIE_NAME, verifySessionToken } from "@/server/auth-session";
+import {
+  AUTH_COOKIE_NAME,
+  REFRESH_COOKIE_NAME,
+  verifyRefreshToken,
+  verifySessionToken,
+} from "@/server/auth-session";
 
 export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
-  const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
-  const user = token ? await verifySessionToken(token) : null;
-  const isAuthenticated = Boolean(user);
+  const accessToken = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  const refreshToken = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
+  const user = accessToken ? await verifySessionToken(accessToken) : null;
+  const canRefresh = refreshToken ? await verifyRefreshToken(refreshToken) : null;
+  const isAuthenticated = Boolean(user || canRefresh);
 
   if (pathname === "/account" && !isAuthenticated) {
     const loginUrl = new URL("/login", request.url);

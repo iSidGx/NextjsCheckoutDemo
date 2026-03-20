@@ -14,6 +14,7 @@ import {
   issueRefreshTokenRecord,
   revokeRefreshTokensForUser,
 } from "@/server/refresh-token-store";
+import { consumeRateLimit, getRequestClientIp } from "@/server/rate-limit";
 import { getUserById } from "@/server/user-store";
 
 export const runtime = "nodejs";
@@ -45,6 +46,24 @@ function unauthorizedResponse() {
 }
 
 export async function POST(request: Request) {
+  const ipAddress = getRequestClientIp(request);
+  const ipLimit = consumeRateLimit(`auth:refresh:ip:${ipAddress}`, {
+    windowMs: 60_000,
+    maxRequests: 30,
+  });
+
+  if (!ipLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many refresh attempts. Please try again shortly." },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(ipLimit.retryAfterSeconds),
+        },
+      },
+    );
+  }
+
   const refreshToken = getCookieValueFromHeader(request.headers.get("cookie"), REFRESH_COOKIE_NAME);
 
   if (!refreshToken) {

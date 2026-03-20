@@ -8,6 +8,7 @@ import {
   REFRESH_COOKIE_NAME,
   REFRESH_TOKEN_TTL_SECONDS,
 } from "@/server/auth-session";
+import { consumeRateLimit, getRequestClientIp } from "@/server/rate-limit";
 import { issueRefreshTokenRecord } from "@/server/refresh-token-store";
 import { createUserAccount } from "@/server/user-store";
 
@@ -19,7 +20,29 @@ const registerSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters."),
 });
 
+function tooManyRequestsResponse(retryAfterSeconds: number) {
+  return NextResponse.json(
+    { error: "Too many authentication attempts. Please try again shortly." },
+    {
+      status: 429,
+      headers: {
+        "Retry-After": String(retryAfterSeconds),
+      },
+    },
+  );
+}
+
 export async function POST(request: Request) {
+  const ipAddress = getRequestClientIp(request);
+  const ipLimit = consumeRateLimit(`auth:register:ip:${ipAddress}`, {
+    windowMs: 60_000,
+    maxRequests: 12,
+  });
+
+  if (!ipLimit.allowed) {
+    return tooManyRequestsResponse(ipLimit.retryAfterSeconds);
+  }
+
   let payload: unknown;
 
   try {
@@ -32,6 +55,15 @@ export async function POST(request: Request) {
 
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input." }, { status: 400 });
+  }
+
+  const accountLimit = consumeRateLimit(`auth:register:account:${parsed.data.email.toLowerCase()}`, {
+    windowMs: 60_000,
+    maxRequests: 5,
+  });
+
+  if (!accountLimit.allowed) {
+    return tooManyRequestsResponse(accountLimit.retryAfterSeconds);
   }
 
   const user = await createUserAccount(parsed.data);
