@@ -4,7 +4,7 @@ import { getSessionUserFromRequest } from "@/server/auth";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const user = getSessionUserFromRequest(request);
+  const user = await getSessionUserFromRequest(request);
 
   if (!user) {
     return NextResponse.json({ user: null }, { status: 401 });

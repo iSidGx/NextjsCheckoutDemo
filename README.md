@@ -8,7 +8,7 @@ Next.js App Router demo for a customizable mug storefront with a product catalog
 - Product customization (size, design, quantity) with live mug preview.
 - Basket management with persisted client state via Zustand.
 - Checkout flow backed by Stripe Checkout (test mode).
-- Secure account login/registration with signed HTTP-only session cookies.
+- Secure account login/registration with JWT access + refresh HTTP-only cookies.
 - Webhook-confirmed order persistence to a lightweight JSON store.
 - Success page that loads and displays the confirmed order record.
 - Account page that shows profile details and past paid orders.
@@ -62,12 +62,14 @@ cp .env.example .env.local
 - `NEXT_PUBLIC_APP_URL`: app base URL (local: `http://localhost:3000`)
 - `STRIPE_SECRET_KEY`: Stripe test secret key (`sk_test_...`)
 - `STRIPE_WEBHOOK_SECRET`: Stripe webhook signing secret (`whsec_...`)
-- `AUTH_SESSION_SECRET`: random secret used to sign session cookies (32+ chars)
+- `JWT_ACCESS_SECRET`: random secret used to sign access JWT cookies (32+ chars)
+- `JWT_REFRESH_SECRET`: random secret used to sign refresh JWT cookies (32+ chars, required in production)
 
 Optional:
 
 - `ORDER_STORE_FILE`: absolute path for JSON order store file (default: `data/orders.json`)
 - `USER_STORE_FILE`: absolute path for JSON user store file (default: `data/users.json`)
+- `REFRESH_TOKEN_STORE_FILE`: absolute path for JSON refresh token store file (default: `data/refresh-tokens.json`)
 
 ## Run locally
 
@@ -110,17 +112,25 @@ If payment is canceled, Stripe returns to `/checkout?canceled=1` and basket cont
 ## Login and account flow
 
 1) Open `/login` and register an account (name, email, password).
-2) Login issues a signed, HTTP-only session cookie.
+2) Login issues short-lived access and long-lived refresh JWT cookies.
 3) Open `/account` to view account info and past paid orders.
 4) Orders are matched by the authenticated account email.
+5) `POST /api/auth/refresh` rotates refresh tokens and issues new auth cookies.
 
 Auth endpoints:
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
+- `POST /api/auth/refresh`
 - `GET /api/auth/me`
 - `GET /api/orders/mine`
+
+### How JWT auth works (short)
+
+- Login/register returns two `httpOnly` cookies: `ma_session` (short-lived access JWT) and `ma_refresh` (long-lived refresh JWT).
+- Protected routes/API calls validate `ma_session`; on expiry, the client calls `POST /api/auth/refresh` to rotate refresh token state and issue fresh cookies.
+- On logout, both cookies are cleared and refresh-token records are revoked from `REFRESH_TOKEN_STORE_FILE`.
 
 ## Order persistence
 

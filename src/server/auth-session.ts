@@ -1,86 +1,138 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
-import { SessionTokenPayload, SessionUser } from "@/domain/auth/types";
+import { JWTPayload, jwtVerify, SignJWT } from "jose";
+import { SessionUser } from "@/domain/auth/types";
 
 export const AUTH_COOKIE_NAME = "ma_session";
-const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
+export const REFRESH_COOKIE_NAME = "ma_refresh";
+export const ACCESS_TOKEN_TTL_SECONDS = 60 * 15;
+export const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
+const JWT_ISSUER = "mug-atelier";
+const ACCESS_JWT_AUDIENCE = "mug-atelier-auth";
+const REFRESH_JWT_AUDIENCE = "mug-atelier-refresh";
 
-function toBase64Url(value: Buffer | string) {
-  return Buffer.from(value).toString("base64url");
+interface SessionJwtPayload extends JWTPayload {
+  sub: string;
+  email: string;
+  name: string;
 }
 
-function fromBase64Url(value: string) {
-  return Buffer.from(value, "base64url").toString("utf8");
-}
-
-function getSessionSecret() {
-  const secret = process.env.AUTH_SESSION_SECRET;
+function getJwtSecret() {
+  const secret = process.env.JWT_ACCESS_SECRET ?? process.env.AUTH_SESSION_SECRET;
 
   if (!secret || secret.length < 32) {
-    throw new Error("AUTH_SESSION_SECRET must be set and at least 32 characters long.");
+    throw new Error(
+      "JWT_ACCESS_SECRET (or AUTH_SESSION_SECRET for backward compatibility) must be set and at least 32 characters long.",
+    );
   }
 
-  return secret;
+  return new TextEncoder().encode(secret);
 }
 
-function signPayload(encodedPayload: string) {
-  return toBase64Url(createHmac("sha256", getSessionSecret()).update(encodedPayload).digest());
+function getRefreshJwtSecret() {
+  const refreshSecret = process.env.JWT_REFRESH_SECRET;
+
+  if (refreshSecret) {
+    if (refreshSecret.length < 32) {
+      throw new Error("JWT_REFRESH_SECRET must be at least 32 characters long.");
+    }
+
+    return new TextEncoder().encode(refreshSecret);
+  }
+
+  const fallbackSecret = process.env.JWT_ACCESS_SECRET ?? process.env.AUTH_SESSION_SECRET;
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("JWT_REFRESH_SECRET must be set in production.");
+  }
+
+  if (!fallbackSecret || fallbackSecret.length < 32) {
+    throw new Error(
+      "JWT_REFRESH_SECRET is recommended; fallback JWT_ACCESS_SECRET/AUTH_SESSION_SECRET must be at least 32 characters long.",
+    );
+  }
+
+  return new TextEncoder().encode(fallbackSecret);
 }
 
-export function createSessionToken(user: SessionUser) {
+export async function createSessionToken(user: SessionUser) {
   const now = Math.floor(Date.now() / 1000);
-  const payload: SessionTokenPayload = {
-    ...user,
-    iat: now,
-    exp: now + SESSION_TTL_SECONDS,
-  };
-  const encodedPayload = toBase64Url(JSON.stringify(payload));
-  const signature = signPayload(encodedPayload);
 
-  return `${encodedPayload}.${signature}`;
+  return new SignJWT({
+    email: user.email,
+    name: user.name,
+  })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setIssuedAt(now)
+    .setIssuer(JWT_ISSUER)
+    .setAudience(ACCESS_JWT_AUDIENCE)
+    .setSubject(user.id)
+    .setExpirationTime(now + ACCESS_TOKEN_TTL_SECONDS)
+    .sign(getJwtSecret());
 }
 
-export function verifySessionToken(token: string) {
-  const [encodedPayload, providedSignature] = token.split(".");
+interface RefreshJwtPayload extends JWTPayload {
+  sub: string;
+  tokenId: string;
+}
 
-  if (!encodedPayload || !providedSignature) {
-    return null;
-  }
+export async function createRefreshToken(params: { userId: string; tokenId: string }) {
+  const now = Math.floor(Date.now() / 1000);
 
-  const expectedSignature = signPayload(encodedPayload);
-  const providedBuffer = Buffer.from(providedSignature);
-  const expectedBuffer = Buffer.from(expectedSignature);
+  return new SignJWT({
+    tokenId: params.tokenId,
+  })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setIssuedAt(now)
+    .setIssuer(JWT_ISSUER)
+    .setAudience(REFRESH_JWT_AUDIENCE)
+    .setSubject(params.userId)
+    .setExpirationTime(now + REFRESH_TOKEN_TTL_SECONDS)
+    .sign(getRefreshJwtSecret());
+}
 
-  if (providedBuffer.length !== expectedBuffer.length) {
-    return null;
-  }
-
-  if (!timingSafeEqual(providedBuffer, expectedBuffer)) {
-    return null;
-  }
-
-  let payload: SessionTokenPayload;
-
+export async function verifySessionToken(token: string) {
+  let payload: SessionJwtPayload;
   try {
-    payload = JSON.parse(fromBase64Url(encodedPayload)) as SessionTokenPayload;
+    const verified = await jwtVerify<SessionJwtPayload>(token, getJwtSecret(), {
+      issuer: JWT_ISSUER,
+      audience: ACCESS_JWT_AUDIENCE,
+    });
+    payload = verified.payload;
   } catch {
     return null;
   }
 
-  const now = Math.floor(Date.now() / 1000);
-
-  if (!payload.exp || payload.exp <= now) {
-    return null;
-  }
-
-  if (!payload.id || !payload.email || !payload.name) {
+  if (!payload.sub || !payload.email || !payload.name) {
     return null;
   }
 
   return {
-    id: payload.id,
+    id: payload.sub,
     email: payload.email,
     name: payload.name,
   } as SessionUser;
+}
+
+export async function verifyRefreshToken(token: string) {
+  let payload: RefreshJwtPayload;
+
+  try {
+    const verified = await jwtVerify<RefreshJwtPayload>(token, getRefreshJwtSecret(), {
+      issuer: JWT_ISSUER,
+      audience: REFRESH_JWT_AUDIENCE,
+    });
+    payload = verified.payload;
+  } catch {
+    return null;
+  }
+
+  if (!payload.sub || !payload.tokenId) {
+    return null;
+  }
+
+  return {
+    userId: payload.sub,
+    tokenId: payload.tokenId,
+  };
 }
 
 export function getSessionTokenFromCookieHeader(cookieHeader: string | null) {
@@ -94,6 +146,24 @@ export function getSessionTokenFromCookieHeader(cookieHeader: string | null) {
     const [rawName, ...rawValue] = entry.trim().split("=");
 
     if (rawName === AUTH_COOKIE_NAME) {
+      return decodeURIComponent(rawValue.join("="));
+    }
+  }
+
+  return null;
+}
+
+export function getCookieValueFromHeader(cookieHeader: string | null, cookieName: string) {
+  if (!cookieHeader) {
+    return null;
+  }
+
+  const entries = cookieHeader.split(";");
+
+  for (const entry of entries) {
+    const [rawName, ...rawValue] = entry.trim().split("=");
+
+    if (rawName === cookieName) {
       return decodeURIComponent(rawValue.join("="));
     }
   }

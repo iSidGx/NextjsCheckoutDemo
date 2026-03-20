@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { fetchWithAuthRetry } from "@/lib/auth-client";
 import { useBasketStore } from "@/store/basket-store";
 
 interface SessionUser {
@@ -21,7 +22,7 @@ export function SiteHeader() {
 
     const loadSession = async () => {
       try {
-        const response = await fetch("/api/auth/me", { cache: "no-store" });
+        const response = await fetchWithAuthRetry("/api/auth/me");
 
         if (!response.ok) {
           if (isActive) {

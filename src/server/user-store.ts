@@ -62,6 +62,12 @@ export async function getUserByEmail(email: string) {
   return users.find((user) => user.email.toLowerCase() === normalizedEmail) ?? null;
 }
 
+export async function getUserById(userId: string) {
+  const users = await readUsersFromDisk();
+
+  return users.find((user) => user.id === userId) ?? null;
+}
+
 export async function createUserAccount(input: {
   email: string;
   name: string;
