@@ -22,5 +22,10 @@ export async function GET(_: Request, context: RouteContext) {
     return NextResponse.json({ error: "Order not found." }, { status: 404 });
   }
 
-  return NextResponse.json({ order });
+  return NextResponse.json({
+    order: {
+      ...order,
+      customerEmail: null,
+    },
+  });
 }

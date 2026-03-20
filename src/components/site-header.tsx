@@ -1,12 +1,53 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useBasketStore } from "@/store/basket-store";
+
+interface SessionUser {
+  id: string;
+  email: string;
+  name: string;
+}
 
 export function SiteHeader() {
   const itemCount = useBasketStore((state) =>
     state.items.reduce((total, item) => total + item.quantity, 0),
   );
+  const [user, setUser] = useState<SessionUser | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadSession = async () => {
+      try {
+        const response = await fetch("/api/auth/me", { cache: "no-store" });
+
+        if (!response.ok) {
+          if (isActive) {
+            setUser(null);
+          }
+          return;
+        }
+
+        const data = (await response.json()) as { user: SessionUser };
+
+        if (isActive) {
+          setUser(data.user);
+        }
+      } catch {
+        if (isActive) {
+          setUser(null);
+        }
+      }
+    };
+
+    void loadSession();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   return (
     <header className="sticky top-0 z-20 border-b border-white/50 bg-[#fffaf4]/80 backdrop-blur-xl">
@@ -38,6 +79,12 @@ export function SiteHeader() {
             <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-900">
               {itemCount}
             </span>
+          </Link>
+          <Link
+            href={user ? "/account" : "/login"}
+            className="rounded-full px-4 py-2 transition hover:bg-white hover:text-stone-900"
+          >
+            {user ? "Account" : "Login"}
           </Link>
         </nav>
       </div>
