@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { PersistedOrderRecord } from "@/domain/orders/types";
 import { formatCurrency } from "@/domain/mugs/pricing";
+import { fetchWithAuthRetry } from "@/lib/auth-client";
 
 interface SessionUser {
   id: string;
@@ -26,7 +27,7 @@ export default function AccountPage() {
       setError(null);
 
       try {
-        const meResponse = await fetch("/api/auth/me", { cache: "no-store" });
+        const meResponse = await fetchWithAuthRetry("/api/auth/me");
 
         if (meResponse.status === 401) {
           window.location.assign("/login");
@@ -47,7 +48,7 @@ export default function AccountPage() {
 
         setUser(meData.user);
 
-        const ordersResponse = await fetch("/api/orders/mine", { cache: "no-store" });
+        const ordersResponse = await fetchWithAuthRetry("/api/orders/mine");
 
         if (!ordersResponse.ok) {
           setError("Unable to load your order history.");

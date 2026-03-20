@@ -16,3 +16,13 @@ export interface SessionTokenPayload extends SessionUser {
   iat: number;
   exp: number;
 }
+
+export interface RefreshTokenRecord {
+  id: string;
+  userId: string;
+  tokenIdHash: string;
+  createdAt: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  replacedByTokenIdHash: string | null;
+}
