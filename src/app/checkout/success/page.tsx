@@ -63,7 +63,7 @@ export default function CheckoutSuccessPage() {
 
             return;
           }
-        } catch (error) {
+        } catch {
           // Respect aborts and unmounts: do not update state if no longer active.
           if (!isActive || controller.signal.aborted) {
             return;

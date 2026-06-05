@@ -1,89 +1,44 @@
-import path from "node:path";
-import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { PersistedOrderRecord } from "@/domain/orders/types";
+import { getDb } from "@/server/db";
 
-function getOrderStoreFilePath() {
-  return process.env.ORDER_STORE_FILE ?? path.join(process.cwd(), "data", "orders.json");
+async function ordersCollection() {
+  const db = await getDb();
+  return db.collection<PersistedOrderRecord>("orders");
 }
 
-async function readOrdersFromDisk() {
-  try {
-    const storeFilePath = getOrderStoreFilePath();
-    const raw = await readFile(storeFilePath, "utf8");
-    const parsed = JSON.parse(raw) as PersistedOrderRecord[];
-
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed;
-  } catch (error) {
-    const err = error as NodeJS.ErrnoException;
-
-    if (err && typeof err === "object" && err.code === "ENOENT") {
-      // Treat missing file as an empty store.
-      return [];
-    }
-
-    console.error("Failed to read orders from disk:", err);
-    throw err;
-  }
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-async function writeOrdersToDisk(orders: PersistedOrderRecord[]) {
-  const storeFilePath = getOrderStoreFilePath();
-  const directory = path.dirname(storeFilePath);
-
-  await mkdir(directory, { recursive: true });
-
-  const tempFilePath = `${storeFilePath}.tmp-${process.pid}-${Date.now()}`;
-  const serialized = JSON.stringify(orders, null, 2);
-
-  await writeFile(tempFilePath, serialized, "utf8");
-  await rename(tempFilePath, storeFilePath);
-}
-
-let orderStoreQueue: Promise<unknown> = Promise.resolve();
-
-function enqueueOrderStoreOperation<T>(operation: () => Promise<T>): Promise<T> {
-  const result = orderStoreQueue.then(operation, operation);
-  orderStoreQueue = result.then(
-    () => undefined,
-    () => undefined,
+export async function upsertOrderRecord(order: PersistedOrderRecord): Promise<PersistedOrderRecord> {
+  const col = await ordersCollection();
+  await col.replaceOne(
+    { checkoutSessionId: order.checkoutSessionId },
+    order,
+    { upsert: true },
   );
-  return result;
+  return order;
 }
 
-export async function upsertOrderRecord(order: PersistedOrderRecord) {
-  return enqueueOrderStoreOperation(async () => {
-    const existingOrders = await readOrdersFromDisk();
-    const matchingIndex = existingOrders.findIndex(
-      (entry) => entry.checkoutSessionId === order.checkoutSessionId,
-    );
-
-    if (matchingIndex >= 0) {
-      existingOrders[matchingIndex] = order;
-    } else {
-      existingOrders.unshift(order);
-    }
-
-    await writeOrdersToDisk(existingOrders);
-
-    return order;
-  });
+export async function getOrderRecordByCheckoutSessionId(
+  checkoutSessionId: string,
+): Promise<PersistedOrderRecord | null> {
+  const col = await ordersCollection();
+  const doc = await col.findOne({ checkoutSessionId }, { projection: { _id: 0 } });
+  return doc as PersistedOrderRecord | null;
 }
 
-export async function getOrderRecordByCheckoutSessionId(checkoutSessionId: string) {
-  const existingOrders = await readOrdersFromDisk();
-
-  return existingOrders.find((entry) => entry.checkoutSessionId === checkoutSessionId) ?? null;
-}
-
-export async function getOrdersByCustomerEmail(customerEmail: string) {
+export async function getOrdersByCustomerEmail(
+  customerEmail: string,
+): Promise<PersistedOrderRecord[]> {
+  const col = await ordersCollection();
   const normalizedEmail = customerEmail.trim().toLowerCase();
-  const existingOrders = await readOrdersFromDisk();
-
-  return existingOrders
-    .filter((entry) => (entry.customerEmail ?? "").trim().toLowerCase() === normalizedEmail)
-    .sort((a, b) => (a.confirmedAt < b.confirmedAt ? 1 : -1));
+  const docs = await col
+    .find(
+      { customerEmail: { $regex: `^${escapeRegex(normalizedEmail)}$`, $options: "i" } },
+      { projection: { _id: 0 } },
+    )
+    .sort({ confirmedAt: -1 })
+    .toArray();
+  return docs as PersistedOrderRecord[];
 }

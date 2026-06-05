@@ -27,7 +27,7 @@ const createSessionSchema = z.object({
   deliveryOptionId: deliveryOptionSchema,
 });
 
-function getAppOrigin(_request: Request) {
+function getAppOrigin() {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
   if (!appUrl) {
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
   try {
     const payload = createSessionSchema.parse(await request.json());
     const stripe = getStripeClient();
-    const origin = getAppOrigin(request);
+    const origin = getAppOrigin();
     const summary = calculateBasketSummary(payload.items, payload.deliveryOptionId);
     const selectedDelivery = deliveryOptions.find(
       (option) => option.id === payload.deliveryOptionId,

@@ -64,12 +64,7 @@ cp .env.example .env.local
 - `STRIPE_WEBHOOK_SECRET`: Stripe webhook signing secret (`whsec_...`)
 - `JWT_ACCESS_SECRET`: random secret used to sign access JWT cookies (32+ chars)
 - `JWT_REFRESH_SECRET`: random secret used to sign refresh JWT cookies (32+ chars, required in production)
-
-Optional:
-
-- `ORDER_STORE_FILE`: absolute path for JSON order store file (default: `data/orders.json`)
-- `USER_STORE_FILE`: absolute path for JSON user store file (default: `data/users.json`)
-- `REFRESH_TOKEN_STORE_FILE`: absolute path for JSON refresh token store file (default: `data/refresh-tokens.json`)
+- `MONGODB_URI`: MongoDB Atlas connection string (`mongodb+srv://...`)
 
 ## Run locally
 
