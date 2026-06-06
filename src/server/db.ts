@@ -14,8 +14,10 @@ async function ensureIndexes(db: Db): Promise<void> {
     // users — unique email lookup
     db.collection("users").createIndex({ email: 1 }, { unique: true }),
 
-    // orders — unique per Stripe checkout session
+    // orders — unique per Stripe checkout session, unique human-readable ref
     db.collection("orders").createIndex({ checkoutSessionId: 1 }, { unique: true }),
+    db.collection("orders").createIndex({ orderRef: 1 }, { unique: true }),
+    db.collection("orders").createIndex({ userId: 1 }),
     db.collection("orders").createIndex({ customerEmail: 1 }),
 
     // refresh_tokens — lookup paths + TTL auto-expiry

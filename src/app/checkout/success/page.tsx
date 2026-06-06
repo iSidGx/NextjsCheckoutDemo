@@ -125,11 +125,11 @@ export default function CheckoutSuccessPage() {
 
         {order ? (
           <section className="mt-6 rounded-2xl border border-stone-200 bg-stone-50 p-5 text-sm text-stone-700">
-            <h2 className="text-lg font-semibold text-stone-900">Payment record</h2>
+            <h2 className="text-lg font-semibold text-stone-900">Order summary</h2>
             <div className="mt-3 grid gap-2">
               <p>
-                <span className="font-semibold text-stone-900">Session:</span>{" "}
-                <span className="font-mono text-xs">{order.checkoutSessionId}</span>
+                <span className="font-semibold text-stone-900">Order ref:</span>{" "}
+                <span className="font-mono">{order.orderRef}</span>
               </p>
               <p>
                 <span className="font-semibold text-stone-900">Status:</span> {order.paymentStatus}
@@ -147,6 +147,19 @@ export default function CheckoutSuccessPage() {
                   <span className="font-semibold text-stone-900">Customer email:</span>{" "}
                   {order.customerEmail}
                 </p>
+              ) : null}
+              {order.deliveryAddress ? (
+                <div className="border-t border-stone-200 pt-3">
+                  <p className="font-semibold text-stone-900">Delivery address</p>
+                  <address className="mt-1 not-italic leading-6 text-stone-700">
+                    <p>{order.deliveryAddress.name}</p>
+                    <p>{order.deliveryAddress.line1}</p>
+                    {order.deliveryAddress.line2 ? <p>{order.deliveryAddress.line2}</p> : null}
+                    <p>{order.deliveryAddress.city}</p>
+                    <p>{order.deliveryAddress.postcode}</p>
+                    <p>{order.deliveryAddress.country}</p>
+                  </address>
+                </div>
               ) : null}
             </div>
 

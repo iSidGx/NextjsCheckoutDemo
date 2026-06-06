@@ -10,6 +10,7 @@ import {
 import { deliveryOptionSchema } from "@/domain/mugs/validation";
 import { BasketItem } from "@/domain/mugs/types";
 import { getStripeClient } from "@/lib/stripe";
+import { getSessionUserFromRequest } from "@/server/auth";
 
 export const runtime = "nodejs";
 
@@ -22,9 +23,19 @@ const basketItemSchema = z.object({
   addedAt: z.string(),
 });
 
+const addressSchema = z.object({
+  name: z.string().trim().min(1, "Full name is required."),
+  line1: z.string().trim().min(1, "Address line 1 is required."),
+  line2: z.string().trim().default(""),
+  city: z.string().trim().min(1, "City is required."),
+  postcode: z.string().trim().min(1, "Postcode is required."),
+  country: z.string().trim().min(2).max(2, "Please select a country."),
+});
+
 const createSessionSchema = z.object({
   items: z.array(basketItemSchema).min(1),
   deliveryOptionId: deliveryOptionSchema,
+  address: addressSchema,
 });
 
 function getAppOrigin() {
@@ -82,8 +93,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid delivery option." }, { status: 400 });
     }
 
+    // Attach the logged-in user to the session so the webhook can link the order.
+    const sessionUser = await getSessionUserFromRequest(request);
+
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
+      ...(sessionUser ? { customer_email: sessionUser.email } : {}),
       line_items: [
         ...toStripeLineItems(payload.items),
         {
@@ -105,6 +120,13 @@ export async function POST(request: Request) {
         subtotal: String(summary.subtotal),
         total: String(summary.total),
         deliveryOptionId: payload.deliveryOptionId,
+        ...(sessionUser ? { userId: sessionUser.id } : {}),
+        addrName: payload.address.name,
+        addrLine1: payload.address.line1,
+        addrLine2: payload.address.line2,
+        addrCity: payload.address.city,
+        addrPostcode: payload.address.postcode,
+        addrCountry: payload.address.country,
       },
     });
 

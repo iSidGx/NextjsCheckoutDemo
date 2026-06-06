@@ -137,11 +137,11 @@ export default function AccountPage() {
               <div className="mt-4 space-y-3">
                 {orders.map((order) => (
                   <article
-                    key={order.checkoutSessionId}
+                    key={order.orderRef}
                     className="rounded-xl border border-stone-200 bg-white p-4"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="font-semibold text-stone-900">{order.checkoutSessionId}</p>
+                      <p className="font-semibold text-stone-900">Order #{order.orderRef}</p>
                       <p className="text-stone-600">{new Date(order.confirmedAt).toLocaleString()}</p>
                     </div>
                     <p className="mt-2 text-stone-700">
@@ -151,6 +151,13 @@ export default function AccountPage() {
                       <span className="font-semibold text-stone-900">Total:</span>{" "}
                       {formatCurrency(order.amountTotalMinor / 100)}
                     </p>
+                    {order.deliveryAddress ? (
+                      <p className="mt-1 text-stone-600">
+                        <span className="font-semibold text-stone-900">Ship to:</span>{" "}
+                        {order.deliveryAddress.line1}, {order.deliveryAddress.city},{" "}
+                        {order.deliveryAddress.postcode}
+                      </p>
+                    ) : null}
                   </article>
                 ))}
               </div>
