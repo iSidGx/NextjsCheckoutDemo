@@ -1,7 +1,7 @@
-import path from "node:path";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+// @vitest-environment node
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { MongoMemoryServer } from "mongodb-memory-server";
+import { getDb, resetDbCache } from "./db";
 import {
   consumeRefreshTokenRecord,
   issueRefreshTokenRecord,
@@ -9,19 +9,22 @@ import {
 } from "./refresh-token-store";
 
 describe("refresh-token-store", () => {
-  let tempDirectory = "";
+  let mongod: MongoMemoryServer;
 
-  beforeEach(async () => {
-    tempDirectory = await mkdtemp(path.join(tmpdir(), "mug-refresh-"));
-    process.env.REFRESH_TOKEN_STORE_FILE = path.join(tempDirectory, "refresh-tokens.json");
+  beforeAll(async () => {
+    resetDbCache();
+    mongod = await MongoMemoryServer.create();
+    process.env.MONGODB_URI = mongod.getUri();
   });
 
-  afterEach(async () => {
-    delete process.env.REFRESH_TOKEN_STORE_FILE;
+  afterAll(async () => {
+    delete process.env.MONGODB_URI;
+    await mongod.stop();
+  });
 
-    if (tempDirectory) {
-      await rm(tempDirectory, { recursive: true, force: true });
-    }
+  beforeEach(async () => {
+    const db = await getDb();
+    await db.collection("refresh_tokens").deleteMany({});
   });
 
   it("issues and consumes a refresh token once", async () => {
