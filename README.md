@@ -68,23 +68,36 @@ cp .env.example .env.local
 
 ## Run locally
 
-Start the Next.js app:
+Start the Next.js app and Stripe webhook listener together:
 
 ```bash
 npm run dev
 ```
 
-In a second terminal, start Stripe webhook forwarding:
+If you want to run only one side manually:
 
 ```bash
-stripe listen --forward-to localhost:3000/api/webhooks/stripe
+npm run dev:next
+npm run dev:stripe
 ```
+
+`npm run dev` automatically starts `stripe listen --forward-to http://localhost:3000/api/webhooks/stripe` when Stripe CLI is installed.
 
 Copy the printed `whsec_...` value into `.env.local` as `STRIPE_WEBHOOK_SECRET`.
 
 Open the app:
 
 - `http://localhost:3000`
+
+## Vercel deployment + Stripe webhooks
+
+`stripe listen` is for local development only and does not run on Vercel.
+
+After deploying, configure a Stripe Dashboard webhook endpoint:
+
+- URL: `https://<your-vercel-domain>/api/webhooks/stripe`
+- Event: `checkout.session.completed`
+- Copy the webhook signing secret (`whsec_...`) into Vercel env var `STRIPE_WEBHOOK_SECRET`
 
 ## Stripe test checkout flow
 
@@ -136,7 +149,9 @@ Auth endpoints:
 
 ## Available scripts
 
-- `npm run dev` — start local dev server
+- `npm run dev` — start local Next dev server + Stripe CLI listener (if installed)
+- `npm run dev:next` — start local Next dev server only
+- `npm run dev:stripe` — start local Stripe webhook forwarding only
 - `npm run build` — create production build
 - `npm run start` — start production server
 - `npm run lint` — run ESLint
